@@ -1,0 +1,9 @@
+$squareSize: 90px;
+
+.tile {
+    width: $squareSize;
+    height: $squareSize;
+    border: 5px solid grey;
+    border-radius: 6px;
+    margin: 6px;
+}
