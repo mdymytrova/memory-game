@@ -1,5 +1,19 @@
+$squareSize: 90px;
+
+.container {
+    max-width: 500px;
+    margin: auto;
+}
+
 .tiles-container {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
+}
+
+.tile {
+    width: $squareSize;
+    height: $squareSize;
+    border-radius: 6px;
+    margin: 6px;
 }

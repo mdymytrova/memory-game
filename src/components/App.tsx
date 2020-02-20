@@ -1,8 +1,7 @@
 import React from 'react';
 import './App.scss';
-import Tile from './Tile';
-import './Tile.scss';
-import Colors from '../constants/colors.constant';
+import ColorsConstant from '../constants/colors.constant';
+import Helper from '../helper';
 
 interface ITile {
     color: string;
@@ -13,7 +12,6 @@ interface ITile {
 interface IState {
     tiles: ITile[];
     colorToCompare: string;
-    newOpenColor?: string;
 }
 
 class App extends React.Component<{}, IState> {
@@ -29,84 +27,83 @@ class App extends React.Component<{}, IState> {
         }
     }
 
-    private getShuffledColors(): string[] {
-        const colors = [...Colors, ...Colors];
-        for (let i = colors.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [colors[i], colors[j]] = [colors[j], colors[i]];
-        }
-        return colors;
-    }
-
     private getTiles(): ITile[] {
-        const colors = this.getShuffledColors();
+        const colors = Helper.shuffle([...ColorsConstant.colors, ...ColorsConstant.colors]);
         return colors.map((color) => {
-            return {
-                color: color,
-                visible: false
-            };
+            return { color, visible: false };
         });
     }
 
     private getBackgroundColor = (tile: ITile) => {
+        const color = tile.matched ? ColorsConstant.disabled : tile.color;
         return {
-            backgroundColor: tile.visible ? tile.color : 'grey'
+            backgroundColor: tile.visible ? color : ColorsConstant.default
         };
     }
 
     private onTileClick = (clickedTile: ITile, clickedTileIndex: number): () => void => {
         return () => {
-            const { colorToCompare, tiles } = this.state;
-            let updatedTiles;
-            let updatedColorToCompare;
-            if (colorToCompare === '') {
-                updatedTiles = tiles.map((tile, index) => {
-                    if (clickedTileIndex === index) {
-                        tile.visible = true;
-                    }
-                    return tile;
-                });
-                updatedColorToCompare = clickedTile.color;
-            } else if (colorToCompare === clickedTile.color) {
-                updatedTiles = tiles.map((tile, index) => {
-                    if (clickedTile.color === tile.color) {
-                        tile.visible = true;
-                        tile.matched = true;
-                    }
-                    return tile;
-                });
-                updatedColorToCompare = '';
-            } else {
-                updatedTiles = tiles.map((tile, index) => {
-                    if (clickedTileIndex === index) {
-                        tile.visible = true;
-                    }
-                    return tile;
-                });
-                updatedColorToCompare = ''; 
-                this.hideAfterTimout(); 
+            if (!clickedTile.visible) {
+                const { tiles, colorToCompare } = this.getUpdatedState(clickedTile, clickedTileIndex);
+                this.setState({ tiles, colorToCompare });
             }
-            this.setState({ 
-                tiles: updatedTiles,
-                colorToCompare: updatedColorToCompare
-            });
         }
     }
 
-    private hideAfterTimout = () => {
+    private getUpdatedState(clickedTile: ITile, clickedTileIndex: number): IState {
+        const { colorToCompare } = this.state;
+        const colorToAssign = colorToCompare === '' ? clickedTile.color : '';
+
+        return colorToCompare !== clickedTile.color
+            ? this.getDifferentColorState(clickedTileIndex, colorToAssign)
+            : this.getMatchedColorState(clickedTile.color);
+    }
+
+    private getDifferentColorState(clickedTileIndex: number, colorToAssign: string): IState {
+        const tiles = this.getTilesWithUpdatedVisibility(clickedTileIndex);
+        if (colorToAssign === '') {
+            this.resetColorsAfterTimeout();
+        }
+        return { tiles, colorToCompare: colorToAssign };
+    }
+
+    private getMatchedColorState(clickedTileColor: string): IState {
+        const { tiles: oldTiles } = this.state;
+        const matchedIndexes: number[] = [];
+        const tiles = oldTiles.map((tile, index) => {
+            if (clickedTileColor === tile.color) {
+                matchedIndexes.push(index);
+                tile.visible = true;
+            }
+            return tile;
+        });
+        const colorToCompare = '';
+        this.resetColorsAfterTimeout(matchedIndexes);
+        return { tiles, colorToCompare };
+    }
+
+    private getTilesWithUpdatedVisibility(clickedTileIndex: number): ITile[] {
+        const { tiles } = this.state;
+        return tiles.map((tile, index) => {
+            return clickedTileIndex === index ? {...tile, visible: true} : tile;
+        });
+    }
+
+    private resetColorsAfterTimeout = (matchedIndexes?: number[]): void => {
         setTimeout(() => {
-            const { tiles } = this.state;
-            const updatedTiles = tiles.map((tile, index) => {
-                tile.visible = !!tile.matched;
-                return tile;
-            }); 
-            this.setState({ 
-                tiles: updatedTiles
-            });
+            const updatedTiles = this.getUpdatedTilesAfterTimeout(matchedIndexes);
+            this.setState({ tiles: updatedTiles });
         }, 500);
     }
 
-    private restart = () => {
+    private getUpdatedTilesAfterTimeout = (matchedIndexes?: number[]) => {
+        const { tiles } = this.state;
+        return matchedIndexes
+            ? tiles.map((tile, index) => matchedIndexes.indexOf(index) >= 0 ? {...tile, matched: true} : tile)
+            : tiles.map((tile) => ({...tile, visible: !!tile.matched}));  
+    }
+
+    private restart = (): void => {
         this.setState({
             tiles: this.getTiles(),
             colorToCompare: ''
@@ -115,19 +112,18 @@ class App extends React.Component<{}, IState> {
 
     render(): React.ReactNode {
         const { tiles } = this.state;
-        const tilesElements = tiles.map((tile, index) => {
-            return(
-                <div
-                    key={index}
-                    className="tile"
-                    style={this.getBackgroundColor(tile)}
-                    onClick={this.onTileClick(tile, index)}>
-                </div>
-            );
-        });
         return(
-            <div className="tiles-container">
-                {tilesElements}
+            <div className="container">
+                <div className="tiles-container">
+                    {tiles.map((tile, index) => (
+                        <div
+                            key={index}
+                            className="tile"
+                            style={this.getBackgroundColor(tile)}
+                            onClick={this.onTileClick(tile, index)}>
+                        </div>
+                    ))}
+                </div>
                 <button onClick={this.restart}>Restart</button>
             </div>
         );
